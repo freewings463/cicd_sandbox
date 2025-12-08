@@ -1,0 +1,57 @@
+name: build-and-push # 单仓库镜像构建与推送
+
+on:
+  # push 到 main 自动构建；workflow_dispatch 便于手动重试或快速回滚
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+env:
+  # 镜像注册中心 / 项目名称依赖 Secrets，避免硬编码
+  IMAGE_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+  IMAGE_PROJECT:  ${{ secrets.HARBOR_PROJECT }}
+  IMAGE_NAME: app-demo # 建议与仓库名保持一致便于检索
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest # GitHub 托管 runner，预装 Docker & BuildKit
+    permissions:
+      contents: read   # 最小权限：仅读取仓库内容
+      packages: write  # 允许写入 GHCR/缓存，满足 buildx GHA 缓存需求
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 保留完整 Git 历史，方便生成标签或追溯
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3 # 默认 docker-container driver，支持多平台与外部缓存
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }} # Harbor 域名
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Run unit tests
+        run: |
+          # 中文注释：先锁定依赖再执行测试；失败即终止流水线
+          npm ci
+          npm test
+
+      - name: Build and push image (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: . # 使用当前工作区作为构建上下文
+          push: true # 构建完成后推送到远端注册中心
+          tags: |
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:latest # 便于发布/回滚
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }} # 绑定具体 commit
+          cache-from: type=gha # 读取 GitHub Cache v2，加速冷启动
+          cache-to: type=gha,mode=max # 导出全部层到 Cache v2，便于后续命中
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }} # 镜像溯源
+            org.opencontainers.image.revision=${{ github.sha }}       # 精确到 commit
+          sbom: true # 生成 SBOM 供漏洞扫描/合规审计
+          provenance: true # 生成 SLSA provenance，支持供应链验证
