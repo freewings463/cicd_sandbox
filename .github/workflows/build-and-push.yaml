@@ -55,12 +55,12 @@ jobs:
           file: ./app-demo/Dockerfile
           push: true # 构建完成后推送到远端注册中心
           tags: |
-            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:latest # 便于发布/回滚
-            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }} # 绑定具体 commit
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha # 读取 GitHub Cache v2，加速冷启动
           cache-to: type=gha,mode=max # 导出全部层到 Cache v2，便于后续命中
           labels: |
-            org.opencontainers.image.source=${{ github.repository }} # 镜像溯源
-            org.opencontainers.image.revision=${{ github.sha }}       # 精确到 commit
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           sbom: true # 生成 SBOM 供漏洞扫描/合规审计
           provenance: true # 生成 SLSA provenance，支持供应链验证
