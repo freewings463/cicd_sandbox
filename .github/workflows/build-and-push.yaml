@@ -53,10 +53,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver-opts: |
-            env.http_proxy=http://${{ env.GW_IP }}:7891
-            env.https_proxy=http://${{ env.GW_IP }}:7891
-            env.no_proxy=127.0.0.1,localhost,10.96.0.0/12,10.244.0.0/16,${{ env.IMAGE_REGISTRY }}
+          buildkitd-config-inline: |
+            [worker.oci.proxy]
+              httpProxy = "http://${{ env.GW_IP }}:7891"
+              httpsProxy = "http://${{ env.GW_IP }}:7891"
+              noProxy = ["127.0.0.1","localhost","10.96.0.0/12","10.244.0.0/16","${{ env.IMAGE_REGISTRY }}"]
 
       # Step6 登录 Harbor，后续构建/推送需要凭证
       - name: Login to Harbor
