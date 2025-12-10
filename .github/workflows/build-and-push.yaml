@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0 # 保留完整 git 历史，方便标签/追溯
 
-      # Step2 解析宿主机网关 IP，供 BuildKit 代理使用
+      # Step2 解析宿主机网关 IP，供 Harbor 证书/内网访问场景使用（可选）
       - name: Detect gateway for proxy
         run: echo "GW_IP=$(ip route show default 0.0.0.0/0 | awk '/default/ {print $3}')" >> $GITHUB_ENV
 
@@ -49,23 +49,22 @@ jobs:
           pip install -r requirements-dev.txt
           pytest
 
-      # Step5 初始化 Buildx，并给 BuildKit 注入 Clash 代理，避免直连 Docker Hub 超时
+      # Step5 初始化 Buildx，改用 Harbor 的 Docker Hub Proxy Cache 作为镜像源
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           buildkitd-config-inline: |
-            [worker.oci.proxy]
-              httpProxy = "http://${{ env.GW_IP }}:7891"
-              httpsProxy = "http://${{ env.GW_IP }}:7891"
-              noProxy = ["127.0.0.1","localhost","10.96.0.0/12","10.244.0.0/16","${{ env.IMAGE_REGISTRY }}"]
+            [registry."docker.io"]
+              mirrors = ["https://${{ env.IMAGE_REGISTRY }}/dockerhub-proxy"]
+              insecure = true
 
       # Step6 登录 Harbor，后续构建/推送需要凭证
       - name: Login to Harbor
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          username: ${{ secrets.HARBOR_USERNAME }}
-          password: ${{ secrets.HARBOR_PASSWORD }}
+          registry: ${{ env.IMAGE_REGISTRY }} # Harbor 地址（内网）
+          username: ${{ secrets.HARBOR_USERNAME }} # 机器人账户
+          password: ${{ secrets.HARBOR_PASSWORD }} # 机器人 Token
 
       # Step7 构建并推送镜像，启用 GHA 缓存与供应链元数据
       - name: Build and push image (with cache)
@@ -82,5 +81,5 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          sbom: true # 生成 SBOM 供漏洞/合规扫描
+          sbom: false # 临时关闭 SBOM，避免从 docker.io 拉取 syft-scanner 触发超时，待代理/镜像站稳定后再打开
           provenance: true # 生成 SLSA provenance 证明供应链完整性
