@@ -79,14 +79,12 @@ jobs:
           file: ./app-demo/Dockerfile
           push: true # 构建完成后推送到 Harbor
           tags: |
-            # latest 用于默认部署/快速回滚
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:latest
-            # 以 commit SHA 标记，便于精确回溯
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha # 读取 GitHub Actions Cache v2，加速冷启动
           cache-to: type=gha,mode=max # 将所有层写入新缓存后端供后续命中
           labels: |
-            org.opencontainers.image.source=${{ github.repository }} # 镜像溯源到仓库
-            org.opencontainers.image.revision=${{ github.sha }}       # 记录具体 commit
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           sbom: false # 临时关闭 SBOM，避免从 docker.io 拉取 syft-scanner 触发超时，待代理/镜像站稳定后再打开
           provenance: true # 生成 SLSA provenance 证明供应链完整性
