@@ -1,34 +1,45 @@
+# 工作流显示名称，便于在 Actions 列表中识别
 name: build-and-push # 单仓库镜像构建与推送
 
+# 触发条件：push 到 main 或手动触发
 on:
-  # push 到 main 自动构建；workflow_dispatch 便于手动重试或快速回滚
+  # push 触发，限定 main 分支
   push:
     branches: [ main ]
+  # 手动触发入口，便于重试/快速回滚
   workflow_dispatch: {}
 
+# 全局环境变量，引用 Secrets 避免硬编码
 env:
-  # 镜像注册中心 / 项目名称依赖 Secrets，避免硬编码
-  IMAGE_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
-  IMAGE_PROJECT:  ${{ secrets.HARBOR_PROJECT }}
-  IMAGE_NAME: app-demo # 建议与仓库名保持一致便于检索
+  IMAGE_REGISTRY: ${{ secrets.HARBOR_REGISTRY }} # 引用已经通过gh set命令设置在仓库中的 Harbor 内网域名或 IP（例：10.107.131.6）
+  IMAGE_PROJECT:  ${{ secrets.HARBOR_PROJECT }}  # 引用已经通过gh set命令设置在仓库中的 Harbor 项目
+  IMAGE_NAME: app-demo                           # 镜像名，建议与仓库一致
 
 jobs:
+  # 单一 job，负责构建并推送镜像
   docker:
-    runs-on: [self-hosted, linux, x64, harbor-local] # 自托管 runner，具备 Harbor 内网访问
+    runs-on: [self-hosted, linux, x64, harbor-local] # 调度到本地自托管 runner，具备内网 Harbor 访问
     permissions:
-      contents: read   # 最小权限：仅读取仓库内容
-      packages: write  # 允许写入 GHCR/缓存，满足 buildx GHA 缓存需求
+      contents: read   # 仅读取代码即可
+      packages: write  # 允许写入缓存/GHCR 以支持 Buildx 缓存
     steps:
+      # Step1 拉取代码
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 保留完整 Git 历史，方便生成标签或追溯
+          fetch-depth: 0 # 保留完整 git 历史，方便标签/追溯
 
+      # Step2 解析宿主机网关 IP，供 BuildKit 代理使用
+      - name: Detect gateway for proxy
+        run: echo "GW_IP=$(ip route show default 0.0.0.0/0 | awk '/default/ {print $3}')" >> $GITHUB_ENV
+
+      # Step3 安装 Python（用于单元测试依赖）
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # Step4 运行单元测试，失败则终止流水线
       - name: Run unit tests
         working-directory: app-demo
         env:
@@ -38,29 +49,36 @@ jobs:
           pip install -r requirements-dev.txt
           pytest
 
+      # Step5 初始化 Buildx，并给 BuildKit 注入 Clash 代理，避免直连 Docker Hub 超时
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3 # 默认 docker-container driver，支持多平台与外部缓存
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            env.http_proxy=http://${{ env.GW_IP }}:7891
+            env.https_proxy=http://${{ env.GW_IP }}:7891
 
+      # Step6 登录 Harbor，后续构建/推送需要凭证
       - name: Login to Harbor
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.IMAGE_REGISTRY }} # Harbor 域名
+          registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
+      # Step7 构建并推送镜像，启用 GHA 缓存与供应链元数据
       - name: Build and push image (with cache)
         uses: docker/build-push-action@v6
         with:
           context: ./app-demo # 使用应用目录作为构建上下文
           file: ./app-demo/Dockerfile
-          push: true # 构建完成后推送到远端注册中心
+          push: true # 构建完成后推送到 Harbor
           tags: |
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          cache-from: type=gha # 读取 GitHub Cache v2，加速冷启动
-          cache-to: type=gha,mode=max # 导出全部层到 Cache v2，便于后续命中
+          cache-from: type=gha # 读取 GitHub Actions Cache v2，加速冷启动
+          cache-to: type=gha,mode=max # 将所有层写入新缓存后端供后续命中
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          sbom: true # 生成 SBOM 供漏洞扫描/合规审计
-          provenance: true # 生成 SLSA provenance，支持供应链验证
+          sbom: true # 生成 SBOM 供漏洞/合规扫描
+          provenance: true # 生成 SLSA provenance 证明供应链完整性
