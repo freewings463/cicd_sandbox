@@ -18,7 +18,7 @@ env:
 jobs:
   # 单一 job，负责构建并推送镜像
   docker:
-    runs-on: [self-hosted, linux, x64, harbor-local] # 调度到本地自托管 runner，具备内网 Harbor 访问
+    runs-on: [self-hosted, linux, x64] # 调度到本地自托管 runner，具备内网 Harbor 访问
     permissions:
       contents: read   # 仅读取代码即可
       packages: write  # 允许写入缓存/GHCR 以支持 Buildx 缓存
