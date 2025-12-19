@@ -1,0 +1,14 @@
+image:
+  repository: 10.107.131.161/apps/app-demo  # 如实际 Harbor 地址/项目不同，请保持与阶段 0/1 的镜像命名规范一致，例如 10.107.131.161/apps/app-demo
+  tag: PLACEHOLDER                               # 将在 envs/dev/values-dev.yaml 中被 commit SHA 或版本号覆盖
+service:
+  port: 80                                       # 如阶段 0 Service/HTTPRoute 使用了非 80 端口，请保持三者一致
+replicaCount: 1                                  # 可按实际需要调整副本数
+resources:
+  requests:
+    cpu: 100m                                    # 按节点容量和应用负载调整请求/限制
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+host: app-demo.local

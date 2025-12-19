@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-demo
+  namespace: apps-dev
+  labels:
+    app: app-demo
+spec:
+  selector:
+    app: app-demo
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP

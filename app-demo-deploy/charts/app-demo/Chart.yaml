@@ -1,0 +1,5 @@
+apiVersion: v2
+name: app-demo
+version: 0.1.0
+description: Demo app Helm chart (managed by Argo CD GitOps)
+type: application

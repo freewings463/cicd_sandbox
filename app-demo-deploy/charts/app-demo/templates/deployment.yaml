@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-demo
+  namespace: apps-dev
+  labels:
+    app: app-demo
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: app-demo
+  template:
+    metadata:
+      labels:
+        app: app-demo
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/app: "true"
+      imagePullSecrets:
+        - name: app-demo-regcred
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16-alpine
+          env:
+            - name: DB_HOST
+              value: db
+            - name: DB_PORT
+              value: "5432"
+          command: ["sh","-c","until pg_isready -h $DB_HOST -p $DB_PORT; do echo waiting for db; sleep 2; done"]
+      containers:
+        - name: app-demo
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: POSTGRES_USER
+              value: appuser
+            - name: POSTGRES_PASSWORD
+              value: apppassword
+            - name: POSTGRES_DB
+              value: appdb
+            - name: POSTGRES_HOST
+              value: db
+            - name: POSTGRES_PORT
+              value: "5432"
+          resources:
+{{- toYaml .Values.resources | nindent 12 }}
