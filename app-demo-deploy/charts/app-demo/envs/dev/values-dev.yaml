@@ -1,6 +1,6 @@
 image:
-  repository: <HARBOR_DOMAIN_OR_IP>/apps/app-demo
-  tag: PLACEHOLDER
+  repository: 10.107.131.161/apps/app-demo
+  tag: c2cb4ab6e42e4536758effe559945b9a47e40e95
 replicaCount: 1
 resources:
   requests:
