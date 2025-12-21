@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/freewings463/cicd_sandbox.git
     targetRevision: main  # 示例：main / v1.2.3 / 7f3a2c1
-    path: charts/app-demo
+    path: app-demo-deploy/charts/app-demo
     helm:
       valueFiles:
         - envs/dev/values-dev.yaml  # 示例：envs/dev/values-dev.yaml
