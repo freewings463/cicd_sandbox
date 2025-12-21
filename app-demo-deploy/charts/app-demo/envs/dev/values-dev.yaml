@@ -1,6 +1,6 @@
 image:
   repository: 10.107.131.161/apps/app-demo
-  tag: c2cb4ab6e42e4536758effe559945b9a47e40e95
+  tag: 24dca37f265e6cd6b85496df4df3e7c3d266982e
 replicaCount: 1
 resources:
   requests:
