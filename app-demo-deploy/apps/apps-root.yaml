@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/<GIT_ORG_OR_USER>/app-demo-deploy.git
-    targetRevision: main
+    repoURL: https://github.com/freewings463/cicd_sandbox.git
+    targetRevision: main  # 示例：main / v1.2.3 / 7f3a2c1
     path: apps
   destination:
     server: https://kubernetes.default.svc
